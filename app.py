@@ -1,9 +1,28 @@
+
 import streamlit as st
 import requests
 import json
+import os
+
 
 MODEL = "gemma3:1b"
-OLLAMA_URL = "http://localhost:11434/api/chat"
+
+# Local development default.
+# For cloud deployment, configure OLLAMA_URL in Streamlit Secrets.
+OLLAMA_URL = st.secrets.get(
+    "OLLAMA_URL",
+    os.getenv(
+        "OLLAMA_URL",
+        "http://localhost:11434/api/chat"
+    )
+)
+
+OLLAMA_API_KEY = st.secrets.get(
+    "OLLAMA_API_KEY",
+    os.getenv("OLLAMA_API_KEY", "")
+)
+
+
 
 st.set_page_config(
     page_title="Scam Message Investigator",
@@ -20,15 +39,12 @@ st.write(
 
 st.divider()
 
+
 st.subheader("Message Investigation")
 
 message_type = st.selectbox(
     "Select Message Type",
-    [
-        "SMS Message",
-        "Email",
-        "Job Offer"
-    ]
+    ["SMS Message", "Email", "Job Offer"]
 )
 
 user_message = st.text_area(
@@ -37,14 +53,17 @@ user_message = st.text_area(
     placeholder="Paste your suspicious message here..."
 )
 
+
+
+
 def detect_scam(message, category):
 
     prompt = f"""
 You are an AI Cybersecurity Assistant.
 
-Analyse the following message and identify possible scam indicators.
+Analyse the following message for possible scam indicators.
 
-Message Category: {category}
+Category: {category}
 
 Message:
 {message}
@@ -72,11 +91,21 @@ Instructions:
 - Identify suspicious job offers.
 - Identify urgent or threatening language.
 - Explain the reasons clearly.
-- Do not claim that a message is definitely fraudulent without proof.
+- Do not claim a message is definitely fraudulent without proof.
 """
+
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    if OLLAMA_API_KEY:
+        headers["Authorization"] = (
+            "Bearer " + OLLAMA_API_KEY
+        )
 
     response = requests.post(
         OLLAMA_URL,
+        headers=headers,
         json={
             "model": MODEL,
             "messages": [
@@ -97,6 +126,9 @@ Instructions:
 
     return json.loads(result)
 
+
+
+
 if st.button("Investigate Message", type="primary"):
 
     if not user_message.strip():
@@ -105,7 +137,7 @@ if st.button("Investigate Message", type="primary"):
 
     else:
 
-        with st.spinner("Investigating message using AI..."):
+        with st.spinner("AI is analysing your message..."):
 
             try:
 
@@ -115,10 +147,9 @@ if st.button("Investigate Message", type="primary"):
                 )
 
                 st.divider()
-
                 st.header("Investigation Report")
 
-                # Risk Level
+              
                 risk = result.get(
                     "risk_level",
                     "Unknown"
@@ -140,9 +171,8 @@ if st.button("Investigate Message", type="primary"):
 
                     st.info("Risk Level: " + risk)
 
-                # Message Type
+            
                 st.subheader("Message Type")
-
                 st.write(
                     result.get(
                         "message_type",
@@ -150,9 +180,8 @@ if st.button("Investigate Message", type="primary"):
                     )
                 )
 
-                # Summary
+               
                 st.subheader("Message Summary")
-
                 st.write(
                     result.get(
                         "summary",
@@ -160,7 +189,7 @@ if st.button("Investigate Message", type="primary"):
                     )
                 )
 
-                # Warning Signs
+               
                 st.subheader("Warning Signs")
 
                 warning_signs = result.get(
@@ -177,7 +206,7 @@ if st.button("Investigate Message", type="primary"):
 
                     st.write("No warning signs provided.")
 
-                # Recommended Actions
+               
                 st.subheader("Recommended Actions")
 
                 actions = result.get(
@@ -194,7 +223,7 @@ if st.button("Investigate Message", type="primary"):
 
                     st.write("No recommendations provided.")
 
-                # Download Report
+               
                 st.divider()
 
                 report = json.dumps(
@@ -212,7 +241,7 @@ if st.button("Investigate Message", type="primary"):
 
                 st.info(
                     "Safety Note: AI analysis is an estimate. "
-                    "Do not share OTPs, passwords or banking details. "
+                    "Never share OTPs, passwords or banking details. "
                     "Verify suspicious messages through official sources."
                 )
 
@@ -220,7 +249,7 @@ if st.button("Investigate Message", type="primary"):
 
                 st.error(
                     "Cannot connect to Ollama. "
-                    "Please make sure Ollama is running."
+                    "Check whether the Ollama server is available."
                 )
 
             except requests.exceptions.Timeout:
